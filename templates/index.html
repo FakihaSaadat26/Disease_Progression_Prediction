@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Disease Progression Prediction{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="text-align: center; margin-bottom: 3rem;">
+        <h1 style="color: #667eea; font-size: 2.5rem; margin-bottom: 0.5rem;">
+            🏥 Disease Progression Predictor
+        </h1>
+        <p style="font-size: 1.1rem; color: #666;">
+            Enter a patient ID to predict disease progression stage
+        </p>
+    </div>
+
+    <!-- Prediction Form -->
+    <div style="max-width: 600px; margin: 0 auto 3rem; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <form id="prediction-form">
+            <div style="margin-bottom: 1.5rem;">
+                <label for="patient-id" style="display: block; font-weight: bold; margin-bottom: 0.5rem;">
+                    Patient ID:
+                </label>
+                <input type="number" id="patient-id" name="patient_id" 
+                       style="width: 100%; padding: 0.75rem; border: 2px solid #667eea; border-radius: 4px; font-size: 1rem;"
+                       placeholder="Enter patient ID (e.g., 10006)" required>
+                <small style="color: #666;">Find example IDs in the Explore section</small>
+            </div>
+            
+            <button type="submit" style="width: 100%; padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.3s;">
+                🔮 Predict Disease Progression
+            </button>
+        </form>
+    </div>
+
+    <!-- Results Section (hidden by default) -->
+    <div id="results-container" style="display: none; max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        
+        <!-- Stage Display -->
+        <div id="stage-display" style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: #f9f9f9; border-radius: 8px;">
+            <div style="font-size: 0.9rem; color: #666; margin-bottom: 0.5rem;">Predicted Disease Stage</div>
+            <div id="stage-badge" style="display: inline-block; padding: 1rem 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; font-size: 2rem; font-weight: bold; margin-bottom: 1rem;">
+                Stage 0
+            </div>
+            <div id="stage-name" style="font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 0.5rem;">
+                Unknown
+            </div>
+            <div id="confidence-display" style="font-size: 0.95rem; color: #666;">
+                Confidence: <span id="confidence-percent">0%</span>
+            </div>
+        </div>
+
+        <!-- Patient Info -->
+        <div style="background: #f5f5f5; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h3 style="margin-top: 0; color: #333;">Patient Information</h3>
+            <div id="patient-info-display" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.95rem;">
+                <p><strong>Patient ID:</strong> <span id="info-patient-id">-</span></p>
+                <p><strong>Admission Type:</strong> <span id="info-admission-type">-</span></p>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div style="background: #efe; border-left: 4px solid #0f0; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <h3 style="margin-top: 0; color: #0c0;">Clinical Recommendations</h3>
+            <ul id="recommendations-list" style="margin: 0; padding-left: 1.5rem;">
+                <li>Loading recommendations...</li>
+            </ul>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button onclick="document.getElementById('patient-id').value = ''; document.getElementById('results-container').style.display = 'none'; document.getElementById('patient-id').focus();" 
+                    style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                ← Make Another Prediction
+            </button>
+            <a href="/explore" style="padding: 0.75rem 1.5rem; background: #764ba2; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                📊 Explore Data
+            </a>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none; text-align: center; padding: 2rem;">
+        <div style="font-size: 2rem; animation: spin 1s linear infinite;">⏳</div>
+        <p style="font-size: 1.1rem; color: #667eea; margin-top: 1rem;">Making prediction...</p>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error-container" style="display: none; max-width: 600px; margin: 0 auto; background: #fee; border-left: 4px solid #f00; padding: 1.5rem; border-radius: 4px;">
+        <strong style="color: #c00;">Error</strong>
+        <p id="error-message" style="margin: 0.5rem 0 0; color: #c00;"></p>
+        <button onclick="resetForm()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #f00; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Try Again
+        </button>
+    </div>
+</div>
+
+<style>
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<script>
+document.getElementById('prediction-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    makePrediction();
+});
+
+function makePrediction() {
+    const patientId = document.getElementById('patient-id').value;
+    
+    if (!patientId) {
+        showError('Please enter a patient ID');
+        return;
+    }
+
+    // Show loading
+    document.getElementById('loading-indicator').style.display = 'block';
+    document.getElementById('results-container').style.display = 'none';
+    document.getElementById('error-container').style.display = 'none';
+
+    // Make API call
+    fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ patient_id: parseInt(patientId) })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading-indicator').style.display = 'none';
+        
+        if (data.error) {
+            showError(data.error);
+        } else {
+            displayResults(data);
+        }
+    })
+    .catch(err => {
+        document.getElementById('loading-indicator').style.display = 'none';
+        showError('Request failed: ' + err.message);
+    });
+}
+
+function displayResults(data) {
+    const stageColors = ['#28a745', '#ffc107', '#ff9800', '#f44336', '#d32f2f'];
+    const stageNames = ['Stable', 'Mild Progression', 'Moderate Progression', 'Severe Progression', 'Critical'];
+    
+    const stage = data.stage;
+    const confidence = Math.round(data.confidence * 100);
+    
+    // Update stage display
+    const stageBadge = document.getElementById('stage-badge');
+    stageBadge.textContent = 'Stage ' + stage;
+    stageBadge.style.background = stageColors[stage];
+    
+    document.getElementById('stage-name').textContent = stageNames[stage];
+    document.getElementById('confidence-percent').textContent = confidence + '%';
+    
+    // Update patient info
+    document.getElementById('info-patient-id').textContent = data.patient_id;
+    document.getElementById('info-admission-type').textContent = data.admission_type || 'Unknown';
+    
+    // Update recommendations
+    const recList = document.getElementById('recommendations-list');
+    recList.innerHTML = data.recommendations.map(rec => `<li>${rec}</li>`).join('');
+    
+    // Show results
+    document.getElementById('results-container').style.display = 'block';
+}
+
+function showError(message) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-container').style.display = 'block';
+    document.getElementById('loading-indicator').style.display = 'none';
+}
+
+function resetForm() {
+    document.getElementById('patient-id').value = '';
+    document.getElementById('error-container').style.display = 'none';
+    document.getElementById('results-container').style.display = 'none';
+    document.getElementById('patient-id').focus();
+}
+
+// Focus on input on page load
+window.addEventListener('load', function() {
+    document.getElementById('patient-id').focus();
+});
+</script>
+{% endblock %}
